@@ -12,29 +12,29 @@ import {
     ActivityIndicator,
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
-import { Picker } from '@react-native-picker/picker';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
+import { useLocalSearchParams } from 'expo-router';
+import { useEffect } from 'react';
 
-
-const COLORS = {
-    primary: '#A35C7A',
-    secondary: '#C890A7',
-    background: '#F2F3F5',
-    white: '#FFFFFF',
-    black: '#000000',
-    placeholder: '#A35C7A',
-    border: '#C890A7',
-    shadow: '#000',
-    lightGray: '#ddd',
-};
-
+import { COLORS, SPACING, FONT_SIZES } from '../../constants/themes';
 
 export default function AddItem() {
     const [photoUri, setPhotoUri] = useState(null);
     const [name, setName] = useState('');
+
+    const { name: paramName, category: paramCategory, imageUrl: paramImageUrl, id } = useLocalSearchParams();
+
+    useEffect(() => {
+        if (paramName || paramCategory || paramImageUrl) {
+            setName(paramName || '');
+            setCategory(paramCategory || '');
+            setPhotoUri(paramImageUrl || null);
+        }
+    }, [paramName, paramCategory, paramImageUrl]);
+
     const [category, setCategory] = useState('');
     const [customCategoryModalVisible, setCustomCategoryModalVisible] = useState(false);
     const [newCategoryInput, setNewCategoryInput] = useState('');
@@ -50,11 +50,10 @@ export default function AddItem() {
         }
 
         try {
-            setUploading(true); // 🔴 Show loading spinner
-
+            setUploading(true);
             const formData = new FormData();
 
-            if (photoUri) {
+            if (photoUri && !photoUri.startsWith('http')) {
                 formData.append('photo', {
                     uri: photoUri,
                     name: 'photo.jpg',
@@ -65,8 +64,14 @@ export default function AddItem() {
             formData.append('name', name);
             formData.append('category', category);
 
-            const response = await fetch('http://10.0.0.104:3000/items/upload', {
-                method: 'POST',
+            const url = id
+                ? `http://10.0.0.104:3000/items/${id}`
+                : `http://10.0.0.104:3000/items/upload`;
+
+            const method = id ? 'PUT' : 'POST';
+
+            const response = await fetch(url, {
+                method,
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 },
@@ -76,10 +81,11 @@ export default function AddItem() {
             const result = await response.json();
 
             if (response.ok) {
-                // Alert.alert('Success', `Item "${result.item.name}" uploaded successfully!`);
+                // Alert.alert('Success', id ? 'Item updated!' : 'Item uploaded!');
                 setPhotoUri(null);
                 setName('');
                 setCategory('');
+                router.replace('/(tabs)/create');
             } else {
                 throw new Error(result.error || 'Upload failed');
             }
@@ -87,11 +93,9 @@ export default function AddItem() {
             console.error('Upload error:', error);
             Alert.alert('Upload Failed', error.message);
         } finally {
-            setUploading(false); // 🟢 Hide spinner
+            setUploading(false);
         }
-        router.replace('/(tabs)/create');
     };
-
 
     const pickImageFromLibrary = async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -134,8 +138,6 @@ export default function AddItem() {
         setPhotoModalVisible(true);
     };
 
-
-
     const promptNewCategory = () => {
         setNewCategoryInput('');
         setCustomCategoryModalVisible(true);
@@ -144,8 +146,7 @@ export default function AddItem() {
     const router = useRouter();
 
     const API_URL = 'http://10.0.0.104:3000/items';
-    const [results, setResults] = useState([]);
-    const [loading, setLoading] = useState(false);
+
     useFocusEffect(
         useCallback(() => {
             setLoading(true);
@@ -339,7 +340,7 @@ export default function AddItem() {
 
                 <View style={styles.buttonContainer}>
                     <TouchableOpacity onPress={handleUpload} style={[styles.button, styles.uploadButton]}>
-                        <Text style={styles.buttonText}>Upload Item</Text>
+                        <Text style={styles.buttonText}>{id ? 'Update Item' : 'Upload Item'}</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={() => { setPhotoUri(null); router.replace('/(tabs)/create') }} style={[styles.button, styles.cancelButton]}>
                         <Text style={styles.buttonText}>
@@ -390,26 +391,22 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.background,
         overflow: 'hidden',
     },
-
     uploadPlaceholder: {
         justifyContent: 'center',
         alignItems: 'center',
         height: '100%',
         width: '100%',
     },
-
     uploadText: {
         fontSize: 16,
         color: COLORS.secondary,
         fontWeight: '500',
     },
-
     previewImage: {
         width: '100%',
         height: '100%',
         resizeMode: 'cover',
     },
-
     photoModalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.5)',
@@ -430,16 +427,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         flex: 1,
     },
-    optionIcon: {
-        fontSize: 28,
-        marginBottom: 8,
-    },
     optionLabel: {
         fontSize: 14,
         color: '#333',
     },
-
-
     input: {
         // borderBottomWidth: 2,
         // borderBottomColor: '#e0e0e0',
@@ -451,8 +442,6 @@ const styles = StyleSheet.create({
         backgroundColor: COLORS.white,
         borderRadius: 8,
     },
-
-
     dropdownWrapper: {
         marginVertical: 10,
     },
@@ -497,9 +486,6 @@ const styles = StyleSheet.create({
         fontSize: 16,
         color: '#333',
     },
-
-
-
     buttonContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',

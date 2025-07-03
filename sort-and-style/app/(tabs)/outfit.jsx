@@ -4,8 +4,6 @@ import {
   Text,
   StyleSheet,
   Image,
-  TextInput,
-  Modal,
   TouchableOpacity,
   ScrollView,
   Dimensions,
@@ -19,8 +17,6 @@ import { MaterialIcons } from '@expo/vector-icons';
 
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
-
-
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -37,23 +33,25 @@ const tabs = [
 const imageSize = (screenWidth - SPACING.lg * 8);
 
 const App = () => {
-  const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  // const [selectedItem, setSelectedItem] = useState(null);
-  // const [modalVisible, setModalVisible] = useState(false);
   const [categories, setCategories] = useState([]);
   const [activeTab, setActiveTab] = useState(this_page);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const [activeIndex, setActiveIndex] = useState(0);
-  
+  const [activeIndices, setActiveIndices] = useState({});
 
-  const itemScroll = (event) => {
+  const itemScroll = (event, outfitId) => {
     const offsetX = event.nativeEvent.contentOffset.x;
     const newIndex = Math.round(offsetX / imageSize);
-    setActiveIndex(newIndex);
+
+    setActiveIndices((prev) => ({
+      ...prev,
+      [outfitId]: newIndex,
+    }));
   };
+
+
   const router = useRouter();
 
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -77,7 +75,7 @@ const App = () => {
         try {
           const [outfitsRes, itemsRes] = await Promise.all([
             fetch(API_URL),
-            fetch('http://10.0.0.104:3000/items') // Replace with your real endpoint
+            fetch(ITEMS_API_URL) // Replace with your real endpoint
           ]);
 
           const outfits = await outfitsRes.json();
@@ -135,7 +133,6 @@ const App = () => {
 
   // Filter results based on search query and category
   const filteredResults = results.filter(item => {
-    // const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'all' || item.category?.toLowerCase() === selectedCategory;
     return matchesCategory;
   });
@@ -149,26 +146,6 @@ const App = () => {
     { useNativeDriver: false }
   );
 
-  // Calculate sticky search bar visibility
-  const stickySearchOpacity = scrollY.interpolate({
-    inputRange: [STICKY_OFFSET - 20, STICKY_OFFSET],
-    outputRange: [0, 1],
-    extrapolate: 'clamp',
-  });
-
-
-  const openModal = (item) => {
-    console.log('Opening modal for:', item.name);
-    setSelectedItem(item);
-    setModalVisible(true);
-  };
-
-  const closeModal = () => {
-    setModalVisible(false);
-    setSelectedItem(null);
-  };
-
-
   const handleDelete = async (id) => {
     try {
       const response = await fetch(`http://10.0.0.104:3000/outfits/${id}`, {
@@ -181,7 +158,7 @@ const App = () => {
         try {
           const [outfitsRes, itemsRes] = await Promise.all([
             fetch(API_URL),
-            fetch('http://10.0.0.104:3000/items')
+            fetch(ITEMS_API_URL)
           ]);
 
           const outfits = await outfitsRes.json();
@@ -316,14 +293,6 @@ const App = () => {
               <MaterialIcons name="hourglass-empty" size={48} style={styles.emptyStateIcon} />
               <Text style={styles.emptyState}>Loading items...</Text>
             </View>
-          ) : filteredResults.length === 0 ? (
-            <View style={styles.emptyStateContainer}>
-              <MaterialIcons name="search" size={48} style={styles.emptyStateIcon} />
-              <Text style={styles.emptyState}>
-                {searchQuery ? `No outfits found for "${searchQuery}"` : 'No outfits found.'}
-              </Text>
-              <Text style={styles.emptyStateSubtext}>Try adjusting your search or category filter</Text>
-            </View>
           ) : (
             <ScrollView contentContainerStyle={styles.gridContainer}>
               {filteredResults.map((item) => (
@@ -332,7 +301,7 @@ const App = () => {
                     {/* Image carousel */}
                     <ScrollView
                       horizontal
-                      onScroll={itemScroll}
+                      onScroll={(e) => itemScroll(e, item._id)}
                       pagingEnabled
                       showsHorizontalScrollIndicator={false}
                       style={styles.carouselContainer}
@@ -354,7 +323,7 @@ const App = () => {
                           key={index}
                           style={[
                             styles.dot,
-                            index === activeIndex ? styles.activeDot : styles.inactiveDot,
+                            index === (activeIndices[item._id] || 0) ? styles.activeDot : styles.inactiveDot,
                           ]}
                         />
                       ))}
@@ -363,20 +332,35 @@ const App = () => {
                     {/* Bottom row: category + delete */}
                     <View style={styles.itemBottomRow}>
                       <Text style={styles.categoryText}>{item.category}</Text>
-                      <TouchableOpacity
-                        onPress={() =>
-                          Alert.alert('Delete outfit?', 'This action cannot be undone.', [
-                            { text: 'Cancel', style: 'cancel' },
-                            {
-                              text: 'Delete',
-                              style: 'destructive',
-                              onPress: () => handleDelete(item._id),
-                            },
-                          ])
-                        }
-                      >
-                        <MaterialIcons name="delete" size={20} color={COLORS.border} />
-                      </TouchableOpacity>
+                      <View style={styles.itemActions}>
+                        <TouchableOpacity
+                          onPress={() => {
+                            // Navigate to edit page with selected item data
+                            router.push({
+                              pathname: '/(tabs)/add_outfit',
+                              params: { category: item.category, items: item.items.map(it => it._id), id: item._id},
+                            });
+                          }}
+                          style={styles.editButton}
+                        >
+                          <MaterialIcons name="edit" size={24} color={COLORS.border} />
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                          onPress={() =>
+                            Alert.alert('Delete outfit?', 'This action cannot be undone.', [
+                              { text: 'Cancel', style: 'cancel' },
+                              {
+                                text: 'Delete',
+                                style: 'destructive',
+                                onPress: () => handleDelete(item._id),
+                              },
+                            ])
+                          }
+                          style={styles.deleteButton}
+                        >
+                          <MaterialIcons name="delete" size={24} color={COLORS.border} />
+                        </TouchableOpacity>
+                      </View>
                     </View>
                   </View>
                 </View>
@@ -401,31 +385,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.white,
-  },
-  stickySearchContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: COLORS.white,
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.sm,
-    paddingBottom: SPACING.sm,
-    zIndex: 1000,
-    shadowColor: COLORS.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 8,
-  },
-  stickySearchBar: {
-    height: 44,
-    backgroundColor: COLORS.white,
-    borderRadius: 22,
-    paddingHorizontal: SPACING.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    fontSize: FONT_SIZES.md,
   },
   scrollContainer: {
     flex: 1,
@@ -484,21 +443,6 @@ const styles = StyleSheet.create({
   tabTextActive: {
     color: COLORS.white,
     fontWeight: '600',
-  },
-  searchSection: {
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.md,
-    backgroundColor: COLORS.white,
-  },
-  searchBar: {
-    height: 44,
-    backgroundColor: COLORS.white,
-    borderRadius: 22,
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    fontSize: FONT_SIZES.md,
   },
   categoryContainer: {
     paddingHorizontal: SPACING.lg,
@@ -593,18 +537,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: SPACING.xs,
   },
-  emptyStateSubtext: {
-    textAlign: 'center',
-    color: COLORS.primary,
-    fontSize: FONT_SIZES.sm,
-    opacity: 0.7,
-  },
   bottomSpacing: {
     height: 100,
     backgroundColor: COLORS.white,
   },
-
-
   modalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
@@ -629,25 +565,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 10,
   },
-  deleteButton: {
-    backgroundColor: COLORS.primary,
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    marginTop: 10,
-  },
-  deleteButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-  },
   closeButton: {
     marginTop: 15,
   },
   closeButtonText: {
     color: '#666',
   },
-
-
   carouselContainer: {
     height: imageSize,
     aspectRatio: 1,
@@ -655,7 +578,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     marginBottom: 10,
   },
-
   carouselImage: {
     width: imageSize, // same width as grid item
     height: imageSize,
@@ -663,7 +585,6 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginRight: 6,
   },
-
   itemBottomRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -671,15 +592,22 @@ const styles = StyleSheet.create({
     marginTop: 8,
     paddingHorizontal: 4,
   },
-
   categoryText: {
-    fontSize: FONT_SIZES.sm,
+    fontSize: FONT_SIZES.md,
     color: COLORS.primary,
     fontWeight: '500',
     textTransform: 'capitalize',
   },
-
-
+  itemActions: {
+    flexDirection: 'row',
+    alignItems: 'flex-end'
+  },
+  editButton: {
+    marginRight: 5,
+  },
+  deleteButton: {
+    marginLeft: 10,
+  },
   pagination: {
     flexDirection: 'row',
     justifyContent: 'center',
@@ -697,6 +625,4 @@ const styles = StyleSheet.create({
   inactiveDot: {
     backgroundColor: '#ccc',
   },
-
-
 });

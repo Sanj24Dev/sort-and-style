@@ -14,14 +14,14 @@ const port = 3000;
 app.use(cors());
 app.use(express.json());
 
-// ✅ Cloudinary Config
+// Cloudinary Config
 cloudinary.config({
     cloud_name: 'dwasyatyx',
     api_key: 264346711744428,
     api_secret: 'B7PJLm2mccvsTEdGKQQ6EE6nrSA',
 });
 
-// ✅ Cloudinary Storage using Multer
+// Cloudinary Storage using Multer
 const storage = new CloudinaryStorage({
     cloudinary,
     params: {
@@ -32,7 +32,7 @@ const storage = new CloudinaryStorage({
 
 const upload = multer({ storage });
 
-// ✅ MongoDB Setup
+// MongoDB Setup
 const uri = "mongodb+srv://sanjanagn24:sanj@style-and-sort-db.quprgjm.mongodb.net/?retryWrites=true&w=majority&appName=style-and-sort-db";
 const client = new MongoClient(uri);
 let itemsCollection;
@@ -47,17 +47,17 @@ async function startServer() {
         outfitsCollection = db.collection("outfits");
         listsCollection = db.collection("lists");
 
-        console.log("✅ Connected to MongoDB");
+        console.log("Connected to MongoDB");
 
         app.listen(port, '0.0.0.0', () => {
-            console.log(`🚀 Server running on port ${port}`);
+            console.log(`Server running on port ${port}`);
         });
     } catch (error) {
-        console.error("❌ MongoDB connection failed:", error);
+        console.error("MongoDB connection failed:", error);
     }
 }
 
-// ✅ GET all items
+// GET all items
 app.get('/items', async(req, res) => {
     try {
         const items = await itemsCollection.find({}).toArray();
@@ -68,7 +68,7 @@ app.get('/items', async(req, res) => {
     }
 });
 
-// ✅ POST upload route
+// POST upload route
 app.post('/items/upload', upload.single('photo'), async(req, res) => {
     try {
         const { name, category } = req.body;
@@ -84,6 +84,41 @@ app.post('/items/upload', upload.single('photo'), async(req, res) => {
     }
 });
 
+
+app.put('/items/:id', multer().none(), async(req, res) => {
+    try {
+        const { id } = req.params;
+        const objectId = new ObjectId(id);
+
+        const { name, category, imageUrl } = req.body;
+
+        if (!name || !category) {
+            return res.status(400).json({ error: 'Missing required fields: name and category' });
+        }
+
+        const updateFields = {
+            name,
+            category,
+        };
+
+        if (imageUrl) {
+            updateFields.imageUrl = imageUrl;
+        }
+
+        const result = await itemsCollection.updateOne({ _id: objectId }, { $set: updateFields });
+
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ error: 'Item not found' });
+        }
+
+        res.status(200).json({ message: 'Item updated successfully' });
+
+    } catch (err) {
+        console.error('Update failed:', err);
+        res.status(500).json({ error: 'Failed to update item' });
+    }
+});
+
 app.delete('/items/:id', async(req, res) => {
     try {
         const { id } = req.params;
@@ -95,18 +130,42 @@ app.delete('/items/:id', async(req, res) => {
             return res.status(404).json({ error: 'Item not found' });
         }
 
-        await outfitsCollection.updateMany({ items: objectId }, { $pull: { items: objectId } });
+        await outfitsCollection.updateMany({ items: id }, { $pull: { items: id } });
+
+        const allLists = await listsCollection.find().toArray();
+
+        for (const list of allLists) {
+            const newItems = list.items.filter(([itemId, checked]) => {
+                return !(itemId instanceof ObjectId && itemId.equals(objectId));
+            });
+
+            if (newItems.length !== list.items.length) {
+                await listsCollection.updateOne({ _id: list._id }, { $set: { items: newItems } });
+            }
+        }
+
 
         const orphanedOutfits = await outfitsCollection.find({ items: { $size: 0 } }).toArray();
+        const orphanedLists = await listsCollection.find({ items: { $size: 0 } }).toArray();
 
         if (orphanedOutfits.length > 0) {
             const orphanedIds = orphanedOutfits.map(outfit => outfit._id);
             await outfitsCollection.deleteMany({ _id: { $in: orphanedIds } });
         }
 
+        if (orphanedLists.length > 0) {
+            const orphanedListIds = orphanedLists.map(list => list._id);
+            await listsCollection.deleteMany({ _id: { $in: orphanedListIds } });
+        }
+
+        // console.log('Deleted item', id);
+        // console.log('Orphaned outfits:', orphanedOutfits.length);
+        // console.log('Orphaned lists:', orphanedLists.length);
+
         return res.status(200).json({
             message: 'Item deleted successfully',
             outfitsDeleted: orphanedOutfits.length,
+            listsDeleted: orphanedLists.length
         });
 
     } catch (err) {
@@ -168,6 +227,29 @@ app.post('/outfits/upload', multer().none(), async(req, res) => {
     } catch (err) {
         console.error('Upload failed:', err);
         res.status(500).json({ error: 'Upload failed' });
+    }
+});
+
+app.put('/outfits/:id', async(req, res) => {
+    try {
+        const { id } = req.params;
+        const { category, items } = req.body;
+
+        if (!category || !Array.isArray(items)) {
+            return res.status(400).json({ error: 'Missing or invalid category/items' });
+        }
+
+        const result = await outfitsCollection.updateOne({ _id: new ObjectId(id) }, { $set: { category, items } });
+
+        if (result.matchedCount === 0) {
+            return res.status(404).json({ error: 'Outfit not found' });
+        }
+
+        return res.status(200).json({ message: 'Outfit updated successfully' });
+
+    } catch (err) {
+        console.error('PUT /outfits/:id failed:', err);
+        return res.status(500).json({ error: 'Update failed' });
     }
 });
 
@@ -235,10 +317,11 @@ app.put('/lists/:id', async(req, res) => {
         }
 
     } catch (err) {
-        console.error('❌ Update failed:', err);
+        console.error('Update failed:', err);
         return res.status(500).json({ error: 'Failed to update list' });
     }
 });
+
 
 
 app.delete('/lists/:id', async(req, res) => {

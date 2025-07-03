@@ -17,6 +17,8 @@ import { COLORS, SPACING, FONT_SIZES } from '../../constants/themes';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
+import { useLocalSearchParams } from 'expo-router';
+
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
@@ -29,8 +31,22 @@ const AddOutfit = () => {
     const [newCategoryInput, setNewCategoryInput] = useState('');
     const [uploading, setUploading] = useState(false);
     const router = useRouter();
-    // const [selectedCategory, setSelectedCategory] = useState('all');
     const [categories, setCategories] = useState([]);
+
+    const params = useLocalSearchParams();
+    const { id, category: paramCategory, items: paramItems } = params;
+
+    useEffect(() => {
+        if (paramCategory) {
+            setCategory(paramCategory);
+        }
+
+        if (paramItems && Array.isArray(items)) {
+            const selected = items.filter(item => paramItems.includes(item._id));
+            setSelectedItems(selected);
+        }
+    }, [items]); // wait for items to be fetched
+
 
     const ITEMS_URL = 'http://10.0.0.104:3000/items';
     const OUTFITS_URL = 'http://10.0.0.104:3000/outfits';
@@ -84,26 +100,35 @@ const AddOutfit = () => {
         }
 
         try {
-            setUploading(true); // 🔴 Show loading spinner
+            setUploading(true);
 
-            const formData = new FormData();
+            const payload = {
+                category,
+                items: selectedItems.map(item => item._id),
+            };
 
-            formData.append('category', category);
-            formData.append('items', JSON.stringify(selectedItems.map(item => item._id)));
-            const response = await fetch('http://10.0.0.104:3000/outfits/upload', {
-                method: 'POST',
+            const url = id
+                ? `http://10.0.0.104:3000/outfits/${id}`
+                : `http://10.0.0.104:3000/outfits/upload`;
+
+            const method = id ? 'PUT' : 'POST';
+
+            const response = await fetch(url, {
+                method,
                 headers: {
-                    'Content-Type': 'multipart/form-data',
+                    'Content-Type': 'application/json',
                 },
-                body: formData,
+                body: JSON.stringify(payload),
             });
 
             const result = await response.json();
 
             if (response.ok) {
-                // Alert.alert('Success', `Item uploaded successfully!`);
-                setCategory('');
+                // Alert.alert('Success', id ? 'Outfit updated!' : 'Outfit created!');
+                // Reset state after successful upload
                 setSelectedItems([]);
+                setCategory('');
+                router.replace('/(tabs)/create');
             } else {
                 throw new Error(result.error || 'Upload failed');
             }
@@ -111,10 +136,10 @@ const AddOutfit = () => {
             console.error('Upload error:', error);
             Alert.alert('Upload Failed', error.message);
         } finally {
-            setUploading(false); // 🟢 Hide spinner
+            setUploading(false);
         }
-        router.replace('/(tabs)/create');
     };
+
 
     const promptNewCategory = () => {
         setNewCategoryInput('');
@@ -246,7 +271,7 @@ const AddOutfit = () => {
                 <TouchableOpacity
                     style={styles.uploadButton}
                     onPress={handleUpload}>
-                    <Text style={styles.uploadButtonText}>Upload Outfit</Text>
+                    <Text style={styles.uploadButtonText}>{id ? 'Update Item' : 'Upload Item'}</Text>
                 </TouchableOpacity>
                 {uploading && (
                     <Modal
@@ -313,17 +338,17 @@ const styles = StyleSheet.create({
     },
     dropdownButton: {
         backgroundColor: COLORS.white,
-        paddingHorizontal: SPACING.md,
+        paddingHorizontal: SPACING.lg,
         paddingVertical: SPACING.sm,
         borderRadius: 20,
         marginRight: SPACING.md,
-        justifyContent: 'center',
+        justifyContent: 'space-between',
         width: 140,
         alignItems: 'center',
         flexDirection: 'row',
     },
     dropdownButtonText: {
-        fontSize: FONT_SIZES.sm,
+        fontSize: FONT_SIZES.md,
         color: COLORS.black,
     },
     dropdownListWrapper: {
@@ -342,6 +367,7 @@ const styles = StyleSheet.create({
     },
     dropdownItem: {
         paddingVertical: SPACING.sm,
+        paddingHorizontal: SPACING.sm,
     },
     dropdownItemText: {
         fontSize: FONT_SIZES.md,
@@ -420,9 +446,6 @@ const styles = StyleSheet.create({
         color: COLORS.black,
         textAlign: 'center',
     },
-
-
-
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0, 0, 0, 0.4)',
@@ -475,10 +498,6 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         fontSize: 16,
     },
-
-
-
-
     uploadOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.4)',

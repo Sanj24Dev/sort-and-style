@@ -72,7 +72,7 @@ const App = () => {
           data.forEach(item => {
             const cat = item.category?.toLowerCase();
             if (cat && !categoryMap[cat]) {
-              categoryMap[cat] = item.imageUrl; 
+              categoryMap[cat] = item.imageUrl;
             }
           });
 
@@ -153,7 +153,7 @@ const App = () => {
             data.forEach(item => {
               const cat = item.category?.toLowerCase();
               if (cat && !categoryMap[cat]) {
-                categoryMap[cat] = item.imageUrl; 
+                categoryMap[cat] = item.imageUrl;
               }
             });
 
@@ -271,7 +271,7 @@ const App = () => {
                 selectedCategory === item.id && styles.categoryCircleActive
               ]}>
                 <Image
-                  source={{ uri: item.url }}  
+                  source={{ uri: item.url }}
                   style={styles.categoryImage}
                 />
               </View>
@@ -333,29 +333,45 @@ const App = () => {
                     resizeMode="contain"
                   />
                   <Text style={styles.modalTitle}>{selectedItem.name}</Text>
+                  <View style={styles.modalActions}>
 
-                  <TouchableOpacity
-                    style={styles.deleteButton}
-                    onPress={() => {
-                      Alert.alert(
-                        'Confirm Delete',
-                        'Are you sure you want to delete this item?',
-                        [
-                          { text: 'Cancel', style: 'cancel' },
-                          {
-                            text: 'Delete',
-                            style: 'destructive',
-                            onPress: async () => {
-                              await handleDelete(selectedItem._id);
-                              closeModal();
+                    <TouchableOpacity
+                      style={styles.editButton}
+                      onPress={() => {
+                        // Navigate to edit page with selected item data
+                        router.push({
+                          pathname: '/(tabs)/add_item',
+                          params: { name : selectedItem.name, category: selectedItem.category, imageUrl: selectedItem.imageUrl, id: selectedItem._id }
+                        });
+                        closeModal();
+                      }}
+                    >
+                      <Text style={styles.editButtonText}>Edit</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.deleteButton}
+                      onPress={() => {
+                        Alert.alert(
+                          'Confirm Delete',
+                          'Are you sure you want to delete this item?',
+                          [
+                            { text: 'Cancel', style: 'cancel' },
+                            {
+                              text: 'Delete',
+                              style: 'destructive',
+                              onPress: async () => {
+                                await handleDelete(selectedItem._id);
+                                closeModal();
+                              },
                             },
-                          },
-                        ],
-                      );
-                    }}
-                  >
-                    <Text style={styles.deleteButtonText}>Delete</Text>
-                  </TouchableOpacity>
+                          ],
+                        );
+                      }}
+                    >
+                      <Text style={styles.deleteButtonText}>Delete</Text>
+                    </TouchableOpacity>
+                  </View>
 
                   <TouchableOpacity onPress={closeModal} style={styles.closeButton}>
                     <Text style={styles.closeButtonText}>Close</Text>
@@ -413,8 +429,8 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   topBanner: {
-    backgroundColor: COLORS.secondary, 
-    height: screenHeight * 0.2, 
+    backgroundColor: COLORS.secondary,
+    height: screenHeight * 0.2,
     width: '100%',
   },
   header: {
@@ -604,12 +620,31 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     marginBottom: 10,
   },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+  },
+  editButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 10,
+    marginTop: 10,
+    marginRight : 10,
+  },
+  editButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
   deleteButton: {
     backgroundColor: COLORS.primary,
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 10,
     marginTop: 10,
+    marginLeft : 10,
   },
   deleteButtonText: {
     color: 'white',

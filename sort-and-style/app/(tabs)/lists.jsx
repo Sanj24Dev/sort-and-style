@@ -35,7 +35,6 @@ const tabs = [
 
 const App = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
   const [selectedList, setSelectedList] = useState(null);
   const [selectedListItems, setSelectedListItems] = useState([]);
   // const [selectedItems, setSelectedItems] = useState([]);
@@ -134,67 +133,10 @@ const App = () => {
     setModalVisible(true);
   };
 
-
-
-
-
-
   const closeModal = () => {
     setModalVisible(false);
     setSelectedList(null);
     setSelectedListItems(null);
-  };
-
-
-  const handleDelete = async (id) => {
-    try {
-      const response = await fetch(`http://10.0.0.104:3000/items/${id}`, {
-        method: 'DELETE',
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        // Alert.alert('Deleted', data.message);
-        fetch(API_URL)
-          .then(res => res.json())
-          .then(data => {
-            // console.log('Fetched from backend:', data);
-            setResults(data);
-            setLoading(false);
-
-            // Create categories from data
-            const categoryMap = {};
-
-            data.forEach(item => {
-              const cat = item.category?.toLowerCase();
-              if (cat && !categoryMap[cat]) {
-                categoryMap[cat] = item.imageUrl;
-              }
-            });
-
-            const dynamicCategories = [
-              { id: 'all', name: 'All', url: 'https://i.imgur.com/TVNYMQB.png' }, // or use null/default
-              ...Object.entries(categoryMap).map(([id, url]) => ({
-                id,
-                name: id.charAt(0).toUpperCase() + id.slice(1),
-                url,
-              }))
-            ];
-
-            setCategories(dynamicCategories);
-          })
-          .catch(err => {
-            console.error('Failed to fetch items:', err);
-            setLoading(false);
-          });
-      } else {
-        throw new Error(data.error || 'Delete failed');
-      }
-    } catch (error) {
-      console.error('Delete error:', error);
-      Alert.alert('Error', error.message);
-    }
   };
 
   const renderTabItem = (tab) => (
@@ -212,7 +154,7 @@ const App = () => {
     </TouchableOpacity>
   );
 
-  const handleSaveList = async () => {
+  const handleSave = async () => {
     try {
       const formattedItems = selectedListItems.map(item => [
         item._id,
@@ -272,7 +214,7 @@ const App = () => {
   };
 
 
-  const handleDeleteList = async (id) => {
+  const handleDelete = async (id) => {
     try {
       const response = await fetch(`http://10.0.0.104:3000/lists/${id}`, {
         method: 'DELETE',
@@ -413,7 +355,22 @@ const App = () => {
             <View style={styles.modalContent}>
               {selectedList && (
                 <>
-                  <Text style={styles.modalTitle}>{selectedList.name}</Text>
+                  <View style={styles.modalHeader}>
+                    <Text style={styles.modalTitle}>{selectedList.name}</Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        // Navigate to edit page with selected item data
+                        router.push({
+                          pathname: '/(tabs)/add_list',
+                          params: { name: selectedList.name, items: JSON.stringify(selectedList.items), id: selectedList._id },
+                        });
+                        closeModal();
+                      }}
+                      style={styles.editButton}
+                    >
+                      <MaterialIcons name="edit" size={24} color={COLORS.border} />
+                    </TouchableOpacity>
+                  </View>
 
                   <ScrollView style={{ maxHeight: 400 }}>
                     {selectedListItems.map((item) => (
@@ -440,13 +397,13 @@ const App = () => {
                   <View style={styles.modalButtons}>
                     <TouchableOpacity
                       style={styles.confirmButton}
-                      onPress={() => handleSaveList()}
+                      onPress={() => handleSave()}
                     >
                       <Text style={styles.confirmText}>Save</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                       style={styles.deleteButton}
-                      onPress={() => handleDeleteList(selectedList._id)}
+                      onPress={() => handleDelete(selectedList._id)}
                     >
                       <Text style={styles.deleteText}>Delete</Text>
                     </TouchableOpacity>
@@ -721,10 +678,15 @@ const styles = StyleSheet.create({
     width: '85%',
     elevation: 5,
   },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
   modalTitle: {
     fontSize: 18,
     fontWeight: '600',
-    marginBottom: 12,
   },
   itemRow: {
     flexDirection: 'row',
