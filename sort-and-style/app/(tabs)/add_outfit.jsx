@@ -112,7 +112,7 @@ const AddOutfit = () => {
                 : `http://10.0.0.104:3000/outfits/upload`;
 
             const method = id ? 'PUT' : 'POST';
-
+            console.log(payload);
             const response = await fetch(url, {
                 method,
                 headers: {
@@ -170,7 +170,7 @@ const AddOutfit = () => {
                         style={styles.dropdownButton}
                         onPress={() => setDropdownOpen(!dropdownOpen)}
                     >
-                        <Text style={styles.dropdownButtonText}>{category || 'Select Category'}</Text>
+                        <Text style={styles.dropdownButtonText}>{category || 'Category'}</Text>
                         <Text style={styles.dropdownArrow}>
                             {dropdownOpen ? '▲' : '▼'}
                         </Text>
@@ -271,7 +271,7 @@ const AddOutfit = () => {
                 <TouchableOpacity
                     style={styles.uploadButton}
                     onPress={handleUpload}>
-                    <Text style={styles.uploadButtonText}>{id ? 'Update Item' : 'Upload Item'}</Text>
+                    <Text style={styles.uploadButtonText}>{id ? 'Update Outfit' : 'Upload Outfit'}</Text>
                 </TouchableOpacity>
                 {uploading && (
                     <Modal

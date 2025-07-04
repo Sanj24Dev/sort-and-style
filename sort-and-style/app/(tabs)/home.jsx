@@ -293,7 +293,7 @@ const App = () => {
             </View>
           ) : filteredResults.length === 0 ? (
             <View style={styles.emptyStateContainer}>
-              <Text style={styles.emptyStateIcon}>🔍</Text>
+              <MaterialIcons name="search" size={48} style={styles.emptyStateIcon} />
               <Text style={styles.emptyState}>
                 {searchQuery ? `No items found for "${searchQuery}"` : 'No items found.'}
               </Text>
@@ -497,7 +497,7 @@ const styles = StyleSheet.create({
   },
   categoryContainer: {
     paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.xxl,
+    marginBottom: SPACING.xxxl,
   },
   categoryItem: {
     width: 80,
@@ -575,7 +575,7 @@ const styles = StyleSheet.create({
   emptyStateIcon: {
     fontSize: FONT_SIZES.xxxl * 2,
     marginBottom: SPACING.lg,
-    color: COLORS.lightGray,
+    color: COLORS.secondary,
   },
   emptyState: {
     textAlign: 'center',

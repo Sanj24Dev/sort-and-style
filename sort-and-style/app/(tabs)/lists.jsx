@@ -326,11 +326,11 @@ const App = () => {
             </View>
           ) : filteredResults.length === 0 ? (
             <View style={styles.emptyStateContainer}>
-              <Text style={styles.emptyStateIcon}>🔍</Text>
+              <MaterialIcons name="search" size={48} style={styles.emptyStateIcon} />
               <Text style={styles.emptyState}>
                 {searchQuery ? `No items found for "${searchQuery}"` : 'No items found.'}
               </Text>
-              <Text style={styles.emptyStateSubtext}>Try adjusting your search or category filter</Text>
+              <Text style={styles.emptyStateSubtext}>Try adjusting your search</Text>
             </View>
           ) : (
             <View style={styles.gridContainer}>
@@ -611,7 +611,7 @@ const styles = StyleSheet.create({
   emptyStateIcon: {
     fontSize: FONT_SIZES.xxxl * 2,
     marginBottom: SPACING.lg,
-    color: COLORS.lightGray,
+    color: COLORS.secondary,
   },
   emptyState: {
     textAlign: 'center',

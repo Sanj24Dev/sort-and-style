@@ -293,79 +293,87 @@ const App = () => {
               <MaterialIcons name="hourglass-empty" size={48} style={styles.emptyStateIcon} />
               <Text style={styles.emptyState}>Loading items...</Text>
             </View>
+          ) : filteredResults.length === 0 ? (
+          <View style={styles.emptyStateContainer}>
+            <MaterialIcons name="search" size={48} style={styles.emptyStateIcon} />
+            <Text style={styles.emptyState}>
+              No items found.
+            </Text>
+            <Text style={styles.emptyStateSubtext}>Try adjusting category filter</Text>
+          </View>
           ) : (
-            <ScrollView contentContainerStyle={styles.gridContainer}>
-              {filteredResults.map((item) => (
-                <View key={item._id} style={styles.gridItem}>
-                  <View style={styles.resultItem}>
-                    {/* Image carousel */}
-                    <ScrollView
-                      horizontal
-                      onScroll={(e) => itemScroll(e, item._id)}
-                      pagingEnabled
-                      showsHorizontalScrollIndicator={false}
-                      style={styles.carouselContainer}
-                    >
-                      {item.items.map((subItem, index) => (
-                        <Image
-                          key={index}
-                          source={{ uri: subItem.imageUrl }}
-                          style={styles.carouselImage}
-                          onError={() => console.log('Failed to load', subItem.imageUrl)}
-                        />
-                      ))}
-                    </ScrollView>
+          <ScrollView contentContainerStyle={styles.gridContainer}>
+            {filteredResults.map((item) => (
+              <View key={item._id} style={styles.gridItem}>
+                <View style={styles.resultItem}>
+                  {/* Image carousel */}
+                  <ScrollView
+                    horizontal
+                    onScroll={(e) => itemScroll(e, item._id)}
+                    pagingEnabled
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.carouselContainer}
+                  >
+                    {item.items.map((subItem, index) => (
+                      <Image
+                        key={index}
+                        source={{ uri: subItem.imageUrl }}
+                        style={styles.carouselImage}
+                        onError={() => console.log('Failed to load', subItem.imageUrl)}
+                      />
+                    ))}
+                  </ScrollView>
 
-                    {/* Pagination Dots */}
-                    <View style={styles.pagination}>
-                      {item.items.map((_, index) => (
-                        <View
-                          key={index}
-                          style={[
-                            styles.dot,
-                            index === (activeIndices[item._id] || 0) ? styles.activeDot : styles.inactiveDot,
-                          ]}
-                        />
-                      ))}
-                    </View>
+                  {/* Pagination Dots */}
+                  <View style={styles.pagination}>
+                    {item.items.map((_, index) => (
+                      <View
+                        key={index}
+                        style={[
+                          styles.dot,
+                          index === (activeIndices[item._id] || 0) ? styles.activeDot : styles.inactiveDot,
+                        ]}
+                      />
+                    ))}
+                  </View>
 
-                    {/* Bottom row: category + delete */}
-                    <View style={styles.itemBottomRow}>
-                      <Text style={styles.categoryText}>{item.category}</Text>
-                      <View style={styles.itemActions}>
-                        <TouchableOpacity
-                          onPress={() => {
-                            // Navigate to edit page with selected item data
-                            router.push({
-                              pathname: '/(tabs)/add_outfit',
-                              params: { category: item.category, items: item.items.map(it => it._id), id: item._id},
-                            });
-                          }}
-                          style={styles.editButton}
-                        >
-                          <MaterialIcons name="edit" size={24} color={COLORS.border} />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                          onPress={() =>
-                            Alert.alert('Delete outfit?', 'This action cannot be undone.', [
-                              { text: 'Cancel', style: 'cancel' },
-                              {
-                                text: 'Delete',
-                                style: 'destructive',
-                                onPress: () => handleDelete(item._id),
-                              },
-                            ])
-                          }
-                          style={styles.deleteButton}
-                        >
-                          <MaterialIcons name="delete" size={24} color={COLORS.border} />
-                        </TouchableOpacity>
-                      </View>
+                  {/* Bottom row: category + delete */}
+                  <View style={styles.itemBottomRow}>
+                    <Text style={styles.categoryText}>{item.category}</Text>
+                    <View style={styles.itemActions}>
+                      <TouchableOpacity
+                        onPress={() => {
+                          // Navigate to edit page with selected item data
+                          router.push({
+                            pathname: '/(tabs)/add_outfit',
+                            params: { category: item.category, items: item.items.map(it => it._id), id: item._id },
+                          });
+                        }}
+                        style={styles.editButton}
+                      >
+                        <MaterialIcons name="edit" size={24} color={COLORS.border} />
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() =>
+                          Alert.alert('Delete outfit?', 'This action cannot be undone.', [
+                            { text: 'Cancel', style: 'cancel' },
+                            {
+                              text: 'Delete',
+                              style: 'destructive',
+                              onPress: () => handleDelete(item._id),
+                            },
+                          ])
+                        }
+                        style={styles.deleteButton}
+                      >
+                        <MaterialIcons name="delete" size={24} color={COLORS.border} />
+                      </TouchableOpacity>
                     </View>
                   </View>
                 </View>
-              ))}
-            </ScrollView>
+              </View>
+            ))}
+          </ScrollView>
           )}
         </View>
 
@@ -529,6 +537,7 @@ const styles = StyleSheet.create({
   emptyStateIcon: {
     fontSize: FONT_SIZES.xxxl * 2,
     marginBottom: SPACING.lg,
+    color: COLORS.secondary,
   },
   emptyState: {
     textAlign: 'center',
@@ -536,6 +545,12 @@ const styles = StyleSheet.create({
     fontSize: FONT_SIZES.lg,
     fontWeight: '600',
     marginBottom: SPACING.xs,
+  },
+  emptyStateSubtext: {
+    textAlign: 'center',
+    color: COLORS.primary,
+    fontSize: FONT_SIZES.sm,
+    opacity: 0.7,
   },
   bottomSpacing: {
     height: 100,

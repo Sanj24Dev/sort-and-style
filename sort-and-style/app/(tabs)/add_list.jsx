@@ -109,7 +109,7 @@ const AddOutfit = () => {
 
             const url = id
                 ? `http://10.0.0.104:3000/lists/${id}`
-                : `http://10.0.0.104:3000/lists`;
+                : `http://10.0.0.104:3000/lists/upload`;
 
             const method = id ? 'PUT' : 'POST';
 
@@ -184,7 +184,7 @@ const AddOutfit = () => {
                 <TouchableOpacity
                     style={styles.uploadButton}
                     onPress={handleUpload}>
-                    <Text style={styles.uploadButtonText}>{id ? 'Update Item' : 'Upload Item'}</Text>
+                    <Text style={styles.uploadButtonText}>{id ? 'Update List' : 'Upload List'}</Text>
                 </TouchableOpacity>
                 {uploading && (
                     <Modal

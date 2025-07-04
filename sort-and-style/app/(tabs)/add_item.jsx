@@ -149,14 +149,14 @@ export default function AddItem() {
 
     useFocusEffect(
         useCallback(() => {
-            setLoading(true);
+            // setLoading(true);
 
             fetch(API_URL)
                 .then(res => res.json())
                 .then(data => {
                     // console.log('Fetched from backend:', data);
-                    setResults(data);
-                    setLoading(false);
+                    // setResults(data);
+                    // setLoading(false);
 
                     // Create dynamic categories based on fetched items where each item has a category
                     const categorySet = new Set();
@@ -175,7 +175,7 @@ export default function AddItem() {
                 })
                 .catch(err => {
                     console.error('Failed to fetch items:', err);
-                    setLoading(false);
+                    // setLoading(false);
                 });
         }, [])
     );

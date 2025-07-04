@@ -211,15 +211,17 @@ app.delete('/outfits/:id', async(req, res) => {
     }
 });
 
-app.post('/outfits/upload', multer().none(), async(req, res) => {
+app.post('/outfits/upload', async(req, res) => {
     try {
         const { category, items } = req.body;
-        const parsedItems = JSON.parse(items);
 
+        // NO need to parse items here
         const newOutfit = {
             category,
-            items: parsedItems,
+            items,
         };
+
+        console.log(newOutfit); // Verify the structure
 
         await outfitsCollection.insertOne(newOutfit);
 
@@ -265,21 +267,17 @@ app.get('/lists', async(req, res) => {
 });
 
 
-app.post('/lists/upload', multer().none(), async(req, res) => {
+app.post('/lists/upload', async(req, res) => {
     try {
         const { name, items } = req.body;
 
-        const parsedItems = JSON.parse(items); // items: [["itemId", true], ...]
-
-        const formattedItems = parsedItems.map(([id, checked]) => [
-            new ObjectId(id),
-            checked
-        ]);
-
+        // NO need to parse items here
         const newList = {
             name,
-            items: formattedItems
+            items,
         };
+
+        console.log(newList); // Verify the structure
 
         await listsCollection.insertOne(newList);
 
