@@ -6,7 +6,7 @@
 
 - **Frontend**: React Native (Expo)
 - **Backend**: Node.js, Express.js
-- **Database**: MongoDB (via Mongoose)
+- **Database**: MongoDB (via Mongoose) [https://cloud.mongodb.com/v2/685ebeb0293abe0e14d8efc2#/clusters/detail/style-and-sort-db]
 - **Cloud**: Cloudinary for saving images
 
 
