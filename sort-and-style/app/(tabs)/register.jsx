@@ -28,6 +28,10 @@ export default function RegisterScreen() {
             body: JSON.stringify({ name, photoUri, email, password }),
         });
         if (!!res) {
+            setName('');
+            setEmail('');
+            setPassword('');
+            setPhotoUri('');
             router.replace('/login');
         }
     };
@@ -159,7 +163,7 @@ export default function RegisterScreen() {
                     </View>
                 </View>
                 <TouchableOpacity style={styles.loginButton} onPress={() => handleRegister()}>
-                    <Text style={styles.loginText}>Login</Text>
+                    <Text style={styles.loginText}>Register</Text>
                 </TouchableOpacity>
             </View>
         </View>

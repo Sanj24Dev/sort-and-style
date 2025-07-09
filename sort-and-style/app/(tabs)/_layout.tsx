@@ -77,7 +77,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="moodboard"
         options={{
-          title: 'Moodboard',
+          title: 'Wishlist',
           tabBarIcon: ({ color }) => (
             <IconSymbol size={28} name="heart.fill" color={color} />
           ),

@@ -51,7 +51,7 @@ const App = () => {
           <Text style={styles.buttonText}>List</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.button}>
-          <Text style={styles.buttonText}>List</Text>
+          <Text style={styles.buttonText}>Wishlist</Text>
         </TouchableOpacity>
       </View>
     </View>

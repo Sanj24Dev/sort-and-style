@@ -38,9 +38,9 @@ export default function LoginScreen() {
                 pfp: data.pfp,
                 userId: data.userId,
             }));
-            // setLoggedIn(true);
-            // setEmail('');
-            // setPassword('');
+            setLoggedIn(true);
+            setEmail('');
+            setPassword('');
             console.log("From [LoginScreen]:", "Logging in: ", data.name);
             router.replace('/home');
         }
