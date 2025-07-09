@@ -72,7 +72,7 @@ Basic API structure (secured with authentication):
 
 ## 🎥 Demo
 Check out the [demo video](./demo.mp4) to view the features of the **Sort & Style** app.
-[![Sort & Style Demo](./thumnail.png)](./demo.mp4)
+[![Sort & Style Demo](./thumnail.jpg)](./demo.mp4)
 
 ## 🤝 Contributing
 Feel free to fork the repo and submit a pull request. For major changes, open an issue first to discuss the feature or fix.
