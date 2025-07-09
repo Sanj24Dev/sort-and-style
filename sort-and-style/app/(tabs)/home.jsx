@@ -16,6 +16,7 @@ import {
 import { useRouter } from 'expo-router';
 import iconImg from '@/assets/images/icon.png';
 import { MaterialIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
@@ -23,8 +24,11 @@ import { useCallback } from 'react';
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 import { COLORS, SPACING, FONT_SIZES } from '../../constants/themes';
+import { baseStyles } from '../../styles/baseStyles';
 
 const this_page = 'search';
+const logoImgUrl = 'https://i.imgur.com/TVNYMQB.png';
+const API_URL = 'http://10.0.0.104:3000';
 
 const tabs = [
   { id: 'search', name: 'Search', route: '/(tabs)/home' },
@@ -43,6 +47,12 @@ const App = () => {
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
+  const [profileVisible, setProfileVisible] = useState(false);
+  const [userName, setUserName] = useState('');
+  const [pfpUrl, setPfpUrl] = useState('');
+  const [userId, setId] = useState('');
+
+
   const scrollY = useRef(new Animated.Value(0)).current;
   const scrollViewRef = useRef(null);
 
@@ -53,44 +63,67 @@ const App = () => {
   const SEARCH_LABEL_HEIGHT = FONT_SIZES.md + SPACING.xs + SPACING.md; // label + margin + top padding
   const STICKY_OFFSET = HEADER_HEIGHT + TABS_HEIGHT + SEARCH_LABEL_HEIGHT;
 
-  const API_URL = 'http://10.0.0.104:3000/items';
+  const fetchItems = (url) => {
+    fetch(url)
+      .then(res => res.json())
+      .then(data => {
+        // console.log("From [HomeScreen]:", data);
+        if (!Array.isArray(data)) throw new Error("Data is not an array");
+
+        setResults(data);
+        setLoading(false);
+
+        const categoryMap = {};
+        data.forEach(item => {
+          const cat = item.category?.toLowerCase();
+          if (cat && !categoryMap[cat]) {
+            categoryMap[cat] = item.imageUrl;
+          }
+        });
+
+        const dynamicCategories = [
+          { id: 'all', name: 'All', url: logoImgUrl },
+          ...Object.entries(categoryMap).map(([id, url]) => ({
+            id,
+            name: id.charAt(0).toUpperCase() + id.slice(1),
+            url,
+          }))
+        ];
+
+        setCategories(dynamicCategories);
+      })
+      .catch(err => {
+        console.error("From [HomeScreen]:", 'Failed to fetch items:', err);
+        setLoading(false);
+      });
+  };
+
+
+  const getUserInfo = async () => {
+    try {
+      const userStr = await AsyncStorage.getItem('user');
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        console.log("From [HomeScreen]:", "Logged in user: ", user.name);
+        console.log("From [HomeScreen]:", "Logged in id: ", user.userId);
+        console.log("From [HomeScreen]:", "Logged in pfp: ", user.pfp);
+        setUserName(user.name);
+        setPfpUrl(user.pfp);
+        setId(user.userId);
+        const ITEMS_API_URL = `${API_URL}/items?userId=${user.userId}`;
+        console.log("From [HomeScreen], url search: ", ITEMS_API_URL);
+        await fetchItems(ITEMS_API_URL);
+      }
+    } catch (e) {
+      console.error("From [HomeScreen]:", 'Error reading user:', e);
+      setLoading(false);
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
       setLoading(true);
-
-      fetch(API_URL)
-        .then(res => res.json())
-        .then(data => {
-          // console.log('Fetched from backend:', data);
-          setResults(data);
-          setLoading(false);
-
-          // Create categories from data
-          const categoryMap = {};
-
-          data.forEach(item => {
-            const cat = item.category?.toLowerCase();
-            if (cat && !categoryMap[cat]) {
-              categoryMap[cat] = item.imageUrl;
-            }
-          });
-
-          const dynamicCategories = [
-            { id: 'all', name: 'All', url: 'https://i.imgur.com/TVNYMQB.png' }, // or use null/default
-            ...Object.entries(categoryMap).map(([id, url]) => ({
-              id,
-              name: id.charAt(0).toUpperCase() + id.slice(1),
-              url,
-            }))
-          ];
-
-          setCategories(dynamicCategories);
-        })
-        .catch(err => {
-          console.error('Failed to fetch items:', err);
-          setLoading(false);
-        });
+      getUserInfo(); // now getUserInfo will handle fetching items
     }, [])
   );
 
@@ -119,7 +152,7 @@ const App = () => {
 
 
   const openModal = (item) => {
-    console.log('Opening modal for:', item.name);
+    console.log("From [HomeScreen]:", 'Opening modal for:', item.name);
     setSelectedItem(item);
     setModalVisible(true);
   };
@@ -132,51 +165,22 @@ const App = () => {
 
   const handleDelete = async (id) => {
     try {
-      const response = await fetch(`http://10.0.0.104:3000/items/${id}`, {
+      const deleteURL = `${API_URL}/items/${id}?userId=${userId}`;
+      const response = await fetch(deleteURL, {
         method: 'DELETE',
       });
 
       const data = await response.json();
 
       if (response.ok) {
-        // Alert.alert('Deleted', data.message);
-        fetch(API_URL)
-          .then(res => res.json())
-          .then(data => {
-            // console.log('Fetched from backend:', data);
-            setResults(data);
-            setLoading(false);
-
-            // Create categories from data
-            const categoryMap = {};
-
-            data.forEach(item => {
-              const cat = item.category?.toLowerCase();
-              if (cat && !categoryMap[cat]) {
-                categoryMap[cat] = item.imageUrl;
-              }
-            });
-
-            const dynamicCategories = [
-              { id: 'all', name: 'All', url: 'https://i.imgur.com/TVNYMQB.png' }, // or use null/default
-              ...Object.entries(categoryMap).map(([id, url]) => ({
-                id,
-                name: id.charAt(0).toUpperCase() + id.slice(1),
-                url,
-              }))
-            ];
-
-            setCategories(dynamicCategories);
-          })
-          .catch(err => {
-            console.error('Failed to fetch items:', err);
-            setLoading(false);
-          });
+        const ITEMS_API_URL = `${API_URL}/items?userId=${userId}`;
+        console.log("From [HomeScreen], url search: ", ITEMS_API_URL);
+        await fetchItems(ITEMS_API_URL);
       } else {
         throw new Error(data.error || 'Delete failed');
       }
     } catch (error) {
-      console.error('Delete error:', error);
+      console.error("From [HomeScreen]:", 'Delete error:', error);
       Alert.alert('Error', error.message);
     }
   };
@@ -184,30 +188,73 @@ const App = () => {
   const renderTabItem = (tab) => (
     <TouchableOpacity
       key={tab.id}
-      style={[styles.tab, activeTab === tab.id && styles.tabActive]}
+      style={[baseStyles.tab, activeTab === tab.id && baseStyles.tabActive]}
       onPress={() => handleTabPress(tab)}
     >
       <Text style={[
-        styles.tabText,
-        activeTab === tab.id && styles.tabTextActive
+        baseStyles.tabText,
+        activeTab === tab.id && baseStyles.tabTextActive
       ]}>
         {tab.name}
       </Text>
     </TouchableOpacity>
   );
 
-  // console.log(categories)
+  const handleLogoutAccount = async () => {
+    try {
+      const userStr = await AsyncStorage.getItem('user');
+      await AsyncStorage.clear();
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        console.log("From [HomeScreen]:", "Logging out: ", user.name);
+        AsyncStorage.removeItem('user');
+        setProfileVisible(false);
+        setUserName(null);
+        setPfpUrl(null);
+        setId(null);
+        setResults([]);
+        setCategories([]);
+        router.replace('/');
+      } else {
+        setLoading(false); // Only show startup screen if no token
+      }
+    } catch (err) {
+      console.error("From [HomeScreen]:", 'Failed to fetch items:', err);
+      setLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    try {
+      const res = await fetch(`${API_URL}/users/${userId}`, {
+        method: 'DELETE',
+      });
+
+      const result = await res.json();
+
+      if (!res.ok) throw new Error(result.error || 'Unknown error');
+
+      console.log('Account deleted:', result);
+      setProfileVisible(false);
+      await AsyncStorage.clear();
+      router.replace('/');
+    } catch (err) {
+      console.error('Failed to delete account:', err);
+      Alert.alert('Error', 'Could not delete your account. Please try again.');
+    }
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={baseStyles.container}>
       <Animated.View
         style={[
-          styles.stickySearchContainer,
+          baseStyles.stickySearchContainer,
           { opacity: stickySearchOpacity }
         ]}
         pointerEvents={scrollY._value >= STICKY_OFFSET ? 'auto' : 'none'}
       >
         <TextInput
-          style={styles.stickySearchBar}
+          style={baseStyles.stickySearchBar}
           placeholder="Type to search"
           placeholderTextColor={COLORS.placeholder}
           value={searchQuery}
@@ -218,31 +265,79 @@ const App = () => {
       {/* Main Scrollable Content */}
       <Animated.ScrollView
         ref={scrollViewRef}
-        style={styles.scrollContainer}
+        style={baseStyles.scrollContainer}
         onScroll={handleScroll}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={baseStyles.scrollContent}
       >
         {/* Header */}
-        <View style={styles.topBackground}>
-          <View style={styles.topBanner} />
-
-          <View style={styles.header}>
-            <Image source={iconImg} style={styles.avatar} />
-            <Text style={styles.greeting}>Hi Sanjana!</Text>
+        <View>
+          <View style={baseStyles.topBanner} />
+          <View style={baseStyles.header}>
+            <Image source={{ uri: pfpUrl }} style={baseStyles.avatar} />
+            <View style={{ flex: 'column', width: '50%' }}>
+              <Text style={baseStyles.greeting}>Hi {userName}!</Text>
+              <TouchableOpacity style={baseStyles.profileButton} onPress={() => setProfileVisible(true)}>
+                <Text style={baseStyles.profileButtonText}>Profile</Text>
+              </TouchableOpacity>
+              <Modal
+                animationType="slide"
+                transparent={true}
+                visible={profileVisible}
+              >
+                <View style={baseStyles.profileModalOverlay}>
+                  {
+                    profileVisible && (
+                      <>
+                        <View style={baseStyles.profileModal}>
+                          <View style={baseStyles.profileHeader}>
+                            <Image source={{ uri: pfpUrl }} style={baseStyles.pfp} />
+                            <Text style={baseStyles.name}>{userName}</Text>
+                          </View>
+                          <TouchableOpacity style={baseStyles.logoutButton} onPress={() => handleLogoutAccount()}>
+                            <Text style={baseStyles.logoutButtonText}>Logout</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={baseStyles.deleteButton} onPress={() => {
+                            Alert.alert(
+                              'Confirm Delete',
+                              'Are you sure you want to delete this account?',
+                              [
+                                { text: 'Cancel', style: 'cancel' },
+                                {
+                                  text: 'Delete',
+                                  style: 'destructive',
+                                  onPress: async () => {
+                                    await handleDeleteAccount();
+                                  },
+                                },
+                              ],
+                            );
+                          }}>
+                            <Text style={baseStyles.deleteButtonText}>Delete Account</Text>
+                          </TouchableOpacity>
+                          <TouchableOpacity style={baseStyles.closeButton} onPress={() => setProfileVisible(false)}>
+                            <Text style={baseStyles.closeButtonText}>Close</Text>
+                          </TouchableOpacity>
+                        </View>
+                      </>
+                    )
+                  }
+                </View>
+              </Modal>
+            </View>
           </View>
         </View>
 
         {/* Tabs */}
-        <View style={styles.tabs}>
+        <View style={baseStyles.tabs}>
           {tabs.map(renderTabItem)}
         </View>
 
         {/* Search Section */}
-        <View style={styles.searchSection}>
+        <View style={baseStyles.searchSection}>
           <TextInput
-            style={styles.searchBar}
+            style={baseStyles.searchBar}
             placeholder="Type to search"
             placeholderTextColor={COLORS.placeholder}
             value={searchQuery}
@@ -254,29 +349,29 @@ const App = () => {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={styles.categoryScroll}
-          contentContainerStyle={styles.categoryContainer}
+          style={baseStyles.categoryScroll}
+          contentContainerStyle={baseStyles.categoryContainer}
         >
           {categories.map((item) => (
             <TouchableOpacity
               key={item.id}
               style={[
-                styles.categoryItem,
-                selectedCategory === item.id && styles.categoryItemActive
+                baseStyles.categoryItem,
+                selectedCategory === item.id && baseStyles.categoryItemActive
               ]}
               onPress={() => setSelectedCategory(item.id)}
             >
               <View style={[
-                styles.categoryCircle,
-                selectedCategory === item.id && styles.categoryCircleActive
+                baseStyles.categoryCircle,
+                selectedCategory === item.id && baseStyles.categoryCircleActive
               ]}>
                 <Image
                   source={{ uri: item.url }}
-                  style={styles.categoryImage}
+                  style={baseStyles.categoryImage}
                 />
               </View>
               <Text style={[
-                styles.categoryText
+                baseStyles.categoryText
               ]}>
                 {item.name}
               </Text>
@@ -287,17 +382,17 @@ const App = () => {
         {/* Search Results */}
         <View style={styles.results}>
           {loading ? (
-            <View style={styles.emptyStateContainer}>
-              <MaterialIcons name="hourglass-empty" size={48} style={styles.emptyStateIcon} />
-              <Text style={styles.emptyState}>Loading items...</Text>
+            <View style={baseStyles.emptyStateContainer}>
+              <MaterialIcons name="hourglass-empty" size={48} style={baseStyles.emptyStateIcon} />
+              <Text style={baseStyles.emptyState}>Loading items...</Text>
             </View>
           ) : filteredResults.length === 0 ? (
-            <View style={styles.emptyStateContainer}>
-              <MaterialIcons name="search" size={48} style={styles.emptyStateIcon} />
-              <Text style={styles.emptyState}>
+            <View style={baseStyles.emptyStateContainer}>
+              <MaterialIcons name="search" size={48} style={baseStyles.emptyStateIcon} />
+              <Text style={baseStyles.emptyState}>
                 {searchQuery ? `No items found for "${searchQuery}"` : 'No items found.'}
               </Text>
-              <Text style={styles.emptyStateSubtext}>Try adjusting your search or category filter</Text>
+              <Text style={baseStyles.emptyStateSubtext}>Try adjusting your search or category filter</Text>
             </View>
           ) : (
             <View style={styles.gridContainer}>
@@ -323,17 +418,17 @@ const App = () => {
           visible={modalVisible}
           onRequestClose={closeModal}
         >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContainer}>
+          <View style={styles.itemModalOverlay}>
+            <View style={styles.itemModalContainer}>
               {selectedItem && (
                 <>
                   <Image
                     source={{ uri: selectedItem.imageUrl }}
-                    style={styles.modalImage}
+                    style={styles.itemModalImage}
                     resizeMode="contain"
                   />
-                  <Text style={styles.modalTitle}>{selectedItem.name}</Text>
-                  <View style={styles.modalActions}>
+                  <Text style={styles.itemModalTitle}>{selectedItem.name}</Text>
+                  <View style={styles.itemModalActions}>
 
                     <TouchableOpacity
                       style={styles.editButton}
@@ -341,7 +436,7 @@ const App = () => {
                         // Navigate to edit page with selected item data
                         router.push({
                           pathname: '/(tabs)/add_item',
-                          params: { name : selectedItem.name, category: selectedItem.category, imageUrl: selectedItem.imageUrl, id: selectedItem._id }
+                          params: { name: selectedItem.name, category: selectedItem.category, imageUrl: selectedItem.imageUrl, id: selectedItem._id }
                         });
                         closeModal();
                       }}
@@ -384,151 +479,15 @@ const App = () => {
 
 
         {/* Bottom spacing */}
-        <View style={styles.bottomSpacing} />
+        <View style={baseStyles.bottomSpacing} />
       </Animated.ScrollView>
-    </SafeAreaView>
+    </SafeAreaView >
   );
 };
 
 export default App;
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-  },
-  stickySearchContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: COLORS.white,
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.sm,
-    paddingBottom: SPACING.sm,
-    zIndex: 1000,
-    shadowColor: COLORS.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 8,
-  },
-  stickySearchBar: {
-    height: 44,
-    backgroundColor: COLORS.white,
-    borderRadius: 22,
-    paddingHorizontal: SPACING.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    fontSize: FONT_SIZES.md,
-  },
-  scrollContainer: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-  },
-  topBanner: {
-    backgroundColor: COLORS.secondary,
-    height: screenHeight * 0.2,
-    width: '100%',
-  },
-  header: {
-    flexDirection: 'row',
-    marginTop: -SPACING.xxxl - SPACING.xl,
-    paddingHorizontal: SPACING.lg,
-    zIndex: 1,
-  },
-  avatar: {
-    width: screenWidth * 0.40,
-    height: screenWidth * 0.40,
-    borderRadius: screenWidth * 0.20,
-    borderColor: COLORS.primary,
-    borderWidth: 2,
-    marginRight: SPACING.md,
-  },
-  greeting: {
-    fontSize: FONT_SIZES.xl,
-    fontWeight: 'bold',
-    color: COLORS.black,
-    marginTop: 60,
-    marginLeft: SPACING.sm,
-  },
-  tabs: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    paddingVertical: SPACING.md,
-    backgroundColor: COLORS.white,
-  },
-  tab: {
-    backgroundColor: COLORS.background,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.xl,
-    borderRadius: 20,
-    minWidth: screenWidth * 0.25,
-    alignItems: 'center',
-  },
-  tabActive: {
-    backgroundColor: COLORS.primary,
-  },
-  tabText: {
-    color: COLORS.primary,
-    fontWeight: '500',
-    fontSize: FONT_SIZES.sm,
-  },
-  tabTextActive: {
-    color: COLORS.white,
-    fontWeight: '600',
-  },
-  searchSection: {
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.md,
-    backgroundColor: COLORS.white,
-  },
-  searchBar: {
-    height: 44,
-    backgroundColor: COLORS.white,
-    borderRadius: 22,
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    fontSize: FONT_SIZES.md,
-  },
-  categoryContainer: {
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.xxxl,
-  },
-  categoryItem: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: COLORS.white,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.sm,
-    borderWidth: 5,
-    borderColor: COLORS.lightGray,
-  },
-  categoryItemActive: {
-    backgroundColor: COLORS.primary,
-    borderColor: COLORS.primary,
-  },
-  categoryImage: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: '#f0f0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: SPACING.xxl,
-  },
-  categoryText: {
-    color: COLORS.primary,
-    fontSize: FONT_SIZES.sm,
-    fontWeight: '500',
-    marginTop: SPACING.xs,
-  },
   results: {
     flex: 1,
     paddingHorizontal: SPACING.lg,
@@ -566,61 +525,34 @@ const styles = StyleSheet.create({
     color: COLORS.black,
     textAlign: 'center',
   },
-  emptyStateContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: screenHeight * 0.1,
-  },
-  emptyStateIcon: {
-    fontSize: FONT_SIZES.xxxl * 2,
-    marginBottom: SPACING.lg,
-    color: COLORS.secondary,
-  },
-  emptyState: {
-    textAlign: 'center',
-    color: COLORS.primary,
-    fontSize: FONT_SIZES.lg,
-    fontWeight: '600',
-    marginBottom: SPACING.xs,
-  },
-  emptyStateSubtext: {
-    textAlign: 'center',
-    color: COLORS.primary,
-    fontSize: FONT_SIZES.sm,
-    opacity: 0.7,
-  },
-  bottomSpacing: {
-    height: 100,
-    backgroundColor: COLORS.white,
-  },
 
 
-  modalOverlay: {
+
+  itemModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  modalContainer: {
+  itemModalContainer: {
     width: '85%',
     backgroundColor: 'white',
     borderRadius: 16,
     padding: 20,
     alignItems: 'center',
   },
-  modalImage: {
+  itemModalImage: {
     width: 200,
     height: 200,
     borderRadius: 10,
     marginBottom: 15,
   },
-  modalTitle: {
+  itemModalTitle: {
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 10,
   },
-  modalActions: {
+  itemModalActions: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
@@ -632,7 +564,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 10,
     marginTop: 10,
-    marginRight : 10,
+    marginRight: 10,
   },
   editButtonText: {
     color: 'white',
@@ -644,7 +576,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     borderRadius: 10,
     marginTop: 10,
-    marginLeft : 10,
+    marginLeft: 10,
   },
   deleteButtonText: {
     color: 'white',

@@ -17,6 +17,7 @@ import { COLORS, SPACING, FONT_SIZES } from '../../constants/themes';
 import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useLocalSearchParams } from 'expo-router';
 
 
@@ -35,6 +36,7 @@ const AddOutfit = () => {
 
     const params = useLocalSearchParams();
     const { id, category: paramCategory, items: paramItems } = params;
+    const [userId, setId] = useState('');
 
     useEffect(() => {
         if (paramCategory) {
@@ -48,41 +50,62 @@ const AddOutfit = () => {
     }, [items]); // wait for items to be fetched
 
 
-    const ITEMS_URL = 'http://10.0.0.104:3000/items';
-    const OUTFITS_URL = 'http://10.0.0.104:3000/outfits';
+    const API_URL = 'http://10.0.0.104:3000';
+
+    const fetchItems = async (items_url, outfits_url) => {
+        try {
+            const [outfitsRes, itemsRes] = await Promise.all([
+                fetch(outfits_url),
+                fetch(items_url)
+            ]);
+
+            const outfitsData = await outfitsRes.json();
+            const itemsData = await itemsRes.json();
+
+            const categorySet = new Set();
+            outfitsData.forEach(outfit => {
+                if (outfit.category) {
+                    categorySet.add(outfit.category.toLowerCase());
+                }
+            });
+
+            // Map to desired format: label (Capitalized), value (lowercase)
+            const dynamicCategories = Array.from(categorySet).map(cat => ({
+                label: cat.charAt(0).toUpperCase() + cat.slice(1),
+                value: cat,
+            }));
+
+            setItems(itemsData);
+            setCategories(dynamicCategories);
+
+        } catch (err) {
+            console.error("From [OutfitScreen]:", 'Failed to fetch outfits/items:', err);
+            setLoading(false);
+        }
+    };
+
+    const getUserInfo = async () => {
+        try {
+            const userStr = await AsyncStorage.getItem('user');
+            if (userStr) {
+                const user = JSON.parse(userStr);
+                console.log("From [AddOutfit]:", "Logged in id: ", user.userId);
+                setId(user.userId);
+                const ITEMS_API_URL = `${API_URL}/items?userId=${user.userId}`;
+                const OUTFITS_API_URL = `${API_URL}/outfits?userId=${user.userId}`;
+                // console.log("From [OutfitScreen], url search: ", ITEMS_API_URL);
+                await fetchItems(ITEMS_API_URL, OUTFITS_API_URL);
+            }
+        } catch (e) {
+            console.error("From [AddOutfit]:", 'Error reading user:', e);
+        }
+    };
 
     useFocusEffect(
         useCallback(() => {
-            const fetchData = async () => {
-                try {
-                    const [itemsRes, outfitsRes] = await Promise.all([
-                        fetch(ITEMS_URL),
-                        fetch(OUTFITS_URL),
-                    ]);
-
-                    const itemsData = await itemsRes.json();
-                    const outfitsData = await outfitsRes.json();
-                    const categorySet = new Set();
-                    outfitsData.forEach(outfit => {
-                        if (outfit.category) {
-                            categorySet.add(outfit.category.toLowerCase());
-                        }
-                    });
-
-                    // Map to desired format: label (Capitalized), value (lowercase)
-                    const dynamicCategories = Array.from(categorySet).map(cat => ({
-                        label: cat.charAt(0).toUpperCase() + cat.slice(1),
-                        value: cat,
-                    }));
-
-                    setItems(itemsData);
-                    setCategories(dynamicCategories);
-                } catch (err) {
-                    console.error('Error fetching data:', err);
-                }
-            };
-            fetchData();
-        }, []));
+            getUserInfo(); // now getUserInfo will handle fetching items
+        }, [])
+    );
 
     const toggleSelect = (item) => {
         const isSelected = selectedItems.find(i => i._id === item._id);
@@ -105,10 +128,11 @@ const AddOutfit = () => {
             const payload = {
                 category,
                 items: selectedItems.map(item => item._id),
+                userId,
             };
 
             const url = id
-                ? `http://10.0.0.104:3000/outfits/${id}`
+                ? `http://10.0.0.104:3000/outfits/${id}?userId=${userId}`
                 : `http://10.0.0.104:3000/outfits/upload`;
 
             const method = id ? 'PUT' : 'POST';

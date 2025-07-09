@@ -18,6 +18,7 @@ import { useRouter } from 'expo-router';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
 import { useLocalSearchParams } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 
 const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
@@ -25,6 +26,7 @@ const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 const AddOutfit = () => {
     const [items, setItems] = useState([]);
     const [name, setName] = useState('');
+    const [userId, setId] = useState('');
     const [selectedItems, setSelectedItems] = useState([]);
     const [uploading, setUploading] = useState(false);
     const router = useRouter();
@@ -52,24 +54,42 @@ const AddOutfit = () => {
         parsedItems = [];
     }
 
-    const ITEMS_URL = 'http://10.0.0.104:3000/items';
+    const API_URL = 'http://10.0.0.104:3000';
+
+    const fetchItems = async (items_url) => {
+        try {
+            const [itemsRes] = await Promise.all([
+                fetch(items_url),
+            ]);
+
+            const itemsData = await itemsRes.json();
+            setItems(itemsData);
+        } catch (err) {
+            console.error('Error fetching data:', err);
+        }
+    };
+
+    const getUserInfo = async () => {
+        try {
+            const userStr = await AsyncStorage.getItem('user');
+            if (userStr) {
+                const user = JSON.parse(userStr);
+                console.log("From [AddList]:", "Logged in id: ", user.userId);
+                setId(user.userId);
+                const ITEMS_API_URL = `${API_URL}/items?userId=${user.userId}`;
+                await fetchItems(ITEMS_API_URL);
+            }
+        } catch (e) {
+            console.error("From [AddList]:", 'Error reading user:', e);
+        }
+    };
 
     useFocusEffect(
         useCallback(() => {
-            const fetchData = async () => {
-                try {
-                    const [itemsRes] = await Promise.all([
-                        fetch(ITEMS_URL),
-                    ]);
+            getUserInfo(); // now getUserInfo will handle fetching items
+        }, [])
+    );
 
-                    const itemsData = await itemsRes.json();
-                    setItems(itemsData);
-                } catch (err) {
-                    console.error('Error fetching data:', err);
-                }
-            };
-            fetchData();
-        }, []));
 
     const toggleSelect = (item) => {
         const existing = selectedItems.find(i => i._id === item._id);
@@ -105,10 +125,11 @@ const AddOutfit = () => {
 
                     return [item._id, checked];
                 }),
+                userId,
             };
 
             const url = id
-                ? `http://10.0.0.104:3000/lists/${id}`
+                ? `http://10.0.0.104:3000/lists/${id}?userId=${userId}`
                 : `http://10.0.0.104:3000/lists/upload`;
 
             const method = id ? 'PUT' : 'POST';

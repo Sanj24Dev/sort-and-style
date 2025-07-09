@@ -33,7 +33,7 @@ export default function TabLayout() {
           fontSize: 12,
         },
       }}>
-      
+
       {/* Home Tab */}
       <Tabs.Screen
         name="index"
@@ -86,39 +86,51 @@ export default function TabLayout() {
       <Tabs.Screen
         name="home"
         options={{
-          href: null, 
+          href: null,
         }}
       />
       <Tabs.Screen
         name="outfit"
         options={{
-          href: null, 
+          href: null,
         }}
       />
       <Tabs.Screen
         name="lists"
         options={{
-          href: null, 
+          href: null,
         }}
       />
       <Tabs.Screen
         name="add_item"
         options={{
-          href: null, 
+          href: null,
         }}
       />
       <Tabs.Screen
         name="add_outfit"
         options={{
-          href: null, 
+          href: null,
         }}
       />
       <Tabs.Screen
         name="add_list"
         options={{
-          href: null, 
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="login"
+        options={{
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="register"
+        options={{
+          href: null,
         }}
       />
     </Tabs>
-  );
+  )
 }

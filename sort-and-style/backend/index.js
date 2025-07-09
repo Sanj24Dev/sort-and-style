@@ -6,6 +6,8 @@ const cloudinary = require('cloudinary').v2;
 const { CloudinaryStorage } = require('multer-storage-cloudinary');
 const { ObjectId } = require('mongodb');
 require('dotenv').config();
+const jwt = require('jsonwebtoken');
+const JWT_SECRET = 'your_secret_key';
 
 
 const app = express();
@@ -38,6 +40,7 @@ const client = new MongoClient(uri);
 let itemsCollection;
 let outfitsCollection;
 let listsCollection;
+let usersCollection;
 
 async function startServer() {
     try {
@@ -46,6 +49,7 @@ async function startServer() {
         itemsCollection = db.collection("items");
         outfitsCollection = db.collection("outfits");
         listsCollection = db.collection("lists");
+        usersCollection = db.collection("users");
 
         console.log("Connected to MongoDB");
 
@@ -60,7 +64,13 @@ async function startServer() {
 // GET all items
 app.get('/items', async(req, res) => {
     try {
-        const items = await itemsCollection.find({}).toArray();
+        const { userId } = req.query;
+
+        if (!userId) {
+            return res.status(400).json({ error: 'Missing userId in query' });
+        }
+
+        const items = await itemsCollection.find({ userId }).toArray();
         res.json(items);
     } catch (err) {
         console.error("Error fetching items:", err);
@@ -68,15 +78,20 @@ app.get('/items', async(req, res) => {
     }
 });
 
+
 // POST upload route
 app.post('/items/upload', upload.single('photo'), async(req, res) => {
     try {
-        const { name, category } = req.body;
+        const { name, category, userId } = req.body;
         const imageUrl = req.file.path;
 
-        const newItem = { name, category, imageUrl };
-        await itemsCollection.insertOne(newItem);
+        if (!userId) {
+            return res.status(400).json({ error: 'Missing userId in request body' });
+        }
 
+        const newItem = { name, category, imageUrl, userId };
+
+        await itemsCollection.insertOne(newItem);
         res.status(201).json({ message: 'Item uploaded', item: newItem });
     } catch (err) {
         console.error('Upload failed:', err);
@@ -85,22 +100,37 @@ app.post('/items/upload', upload.single('photo'), async(req, res) => {
 });
 
 
+
 app.put('/items/:id', multer().none(), async(req, res) => {
     try {
         const { id } = req.params;
-        const objectId = new ObjectId(id);
+        const { userId } = req.query;
 
+        if (!userId) {
+            return res.status(400).json({ error: 'Missing userId in query' });
+        }
+
+        const objectId = new ObjectId(id);
         const { name, category, imageUrl } = req.body;
 
         if (!name || !category) {
             return res.status(400).json({ error: 'Missing required fields: name and category' });
         }
 
-        const updateFields = {
-            name,
-            category,
-        };
+        // 🔍 Find item first
+        const item = await itemsCollection.findOne({ _id: objectId });
 
+        if (!item) {
+            return res.status(404).json({ error: 'Item not found' });
+        }
+
+        // 🔒 Check ownership
+        if (item.userId !== userId) {
+            return res.status(403).json({ error: 'Unauthorized: Item does not belong to user' });
+        }
+
+        // ✅ Perform update
+        const updateFields = { name, category };
         if (imageUrl) {
             updateFields.imageUrl = imageUrl;
         }
@@ -108,7 +138,7 @@ app.put('/items/:id', multer().none(), async(req, res) => {
         const result = await itemsCollection.updateOne({ _id: objectId }, { $set: updateFields });
 
         if (result.matchedCount === 0) {
-            return res.status(404).json({ error: 'Item not found' });
+            return res.status(404).json({ error: 'Item not found (post-check)' });
         }
 
         res.status(200).json({ message: 'Item updated successfully' });
@@ -122,12 +152,30 @@ app.put('/items/:id', multer().none(), async(req, res) => {
 app.delete('/items/:id', async(req, res) => {
     try {
         const { id } = req.params;
+        const { userId } = req.query;
+
+        if (!userId) {
+            return res.status(400).json({ error: 'Missing userId in query' });
+        }
+
         const objectId = new ObjectId(id);
 
+        // 🛑 Check if the item belongs to the user
+        const item = await itemsCollection.findOne({ _id: objectId });
+
+        if (!item) {
+            return res.status(404).json({ error: 'Item not found' });
+        }
+
+        if (item.userId !== userId) {
+            return res.status(403).json({ error: 'Unauthorized: Item does not belong to user' });
+        }
+
+        // ✅ Proceed with deletion
         const result = await itemsCollection.deleteOne({ _id: objectId });
 
         if (result.deletedCount !== 1) {
-            return res.status(404).json({ error: 'Item not found' });
+            return res.status(404).json({ error: 'Item not found (post-check)' });
         }
 
         await outfitsCollection.updateMany({ items: id }, { $pull: { items: id } });
@@ -144,7 +192,6 @@ app.delete('/items/:id', async(req, res) => {
             }
         }
 
-
         const orphanedOutfits = await outfitsCollection.find({ items: { $size: 0 } }).toArray();
         const orphanedLists = await listsCollection.find({ items: { $size: 0 } }).toArray();
 
@@ -157,10 +204,6 @@ app.delete('/items/:id', async(req, res) => {
             const orphanedListIds = orphanedLists.map(list => list._id);
             await listsCollection.deleteMany({ _id: { $in: orphanedListIds } });
         }
-
-        // console.log('Deleted item', id);
-        // console.log('Orphaned outfits:', orphanedOutfits.length);
-        // console.log('Orphaned lists:', orphanedLists.length);
 
         return res.status(200).json({
             message: 'Item deleted successfully',
@@ -175,9 +218,11 @@ app.delete('/items/:id', async(req, res) => {
 });
 
 
+
 app.get('/outfits', async(req, res) => {
     try {
-        const items = await outfitsCollection.find({}).toArray();
+        const { userId } = req.query;
+        const items = await outfitsCollection.find({ userId }).toArray();
         res.json(items);
     } catch (err) {
         console.error("Error fetching items:", err);
@@ -213,12 +258,12 @@ app.delete('/outfits/:id', async(req, res) => {
 
 app.post('/outfits/upload', async(req, res) => {
     try {
-        const { category, items } = req.body;
-
+        const { category, items, userId } = req.body;
         // NO need to parse items here
         const newOutfit = {
             category,
             items,
+            userId,
         };
 
         console.log(newOutfit); // Verify the structure
@@ -236,9 +281,25 @@ app.put('/outfits/:id', async(req, res) => {
     try {
         const { id } = req.params;
         const { category, items } = req.body;
+        const { userId } = req.query;
+
+        if (!userId) {
+            return res.status(400).json({ error: 'Missing userId in query' });
+        }
 
         if (!category || !Array.isArray(items)) {
             return res.status(400).json({ error: 'Missing or invalid category/items' });
+        }
+
+        const outfit = await outfitsCollection.findOne({ _id: new ObjectId(id) });
+
+        if (!outfit) {
+            return res.status(404).json({ error: 'Outfit not found' });
+        }
+
+        // 🔒 Check ownership
+        if (outfit.userId !== userId) {
+            return res.status(403).json({ error: 'Unauthorized: Item does not belong to user' });
         }
 
         const result = await outfitsCollection.updateOne({ _id: new ObjectId(id) }, { $set: { category, items } });
@@ -258,7 +319,8 @@ app.put('/outfits/:id', async(req, res) => {
 
 app.get('/lists', async(req, res) => {
     try {
-        const items = await listsCollection.find({}).toArray();
+        const { userId } = req.query;
+        const items = await listsCollection.find({ userId }).toArray();
         res.json(items);
     } catch (err) {
         console.error("Error fetching items:", err);
@@ -269,12 +331,13 @@ app.get('/lists', async(req, res) => {
 
 app.post('/lists/upload', async(req, res) => {
     try {
-        const { name, items } = req.body;
+        const { name, items, userId } = req.body;
 
         // NO need to parse items here
         const newList = {
             name,
             items,
+            userId,
         };
 
         console.log(newList); // Verify the structure
@@ -293,9 +356,25 @@ app.put('/lists/:id', async(req, res) => {
     try {
         const { id } = req.params;
         const { items } = req.body; // expected format: [[stringId, true], [stringId, false]]
+        const { userId } = req.query;
+
+        if (!userId) {
+            return res.status(400).json({ error: 'Missing userId in query' });
+        }
 
         if (!Array.isArray(items)) {
             return res.status(400).json({ error: 'Invalid items format' });
+        }
+
+        const list = await listsCollection.findOne({ _id: new ObjectId(id) });
+
+        if (!list) {
+            return res.status(404).json({ error: 'List not found' });
+        }
+
+        // 🔒 Check ownership
+        if (list.userId !== userId) {
+            return res.status(403).json({ error: 'Unauthorized: List does not belong to user' });
         }
 
         const formattedItems = items.map(([idStr, checked]) => [
@@ -342,6 +421,61 @@ app.delete('/lists/:id', async(req, res) => {
         return res.status(500).json({ error: 'Delete failed' });
     }
 });
+
+
+
+
+app.post('/register', async(req, res) => {
+    try {
+        const { name, photoUri, email, password } = req.body;
+        const user = { name, photoUri, email, password };
+        await usersCollection.insertOne(user);
+        // const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '24h' });
+        res.json({ token });
+    } catch (err) {
+        res.status(400).json({ error: 'User already exists or invalid input' });
+    }
+});
+
+
+app.post('/login', async(req, res) => {
+    const { email, password } = req.body;
+    const user = await usersCollection.findOne({ email });
+    if (!user || password != user.password) {
+        return res.status(401).json({ error: 'Invalid credentials' });
+    }
+    const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '24h' });
+    res.json({ name: user.name, email, pfp: user.photoUri, userId: user._id });
+});
+
+app.delete('/users/:userId', async(req, res) => {
+    const { userId } = req.params;
+
+    try {
+        if (!userId) {
+            return res.status(400).json({ error: 'Missing userId' });
+        }
+        const userObjectId = new ObjectId(userId);
+        const userResult = await usersCollection.deleteOne({ _id: userObjectId });
+
+        const itemsResult = await itemsCollection.deleteMany({ userId });
+        const outfitsResult = await outfitsCollection.deleteMany({ userId });
+        const listsResult = await listsCollection.deleteMany({ userId });
+
+        return res.status(200).json({
+            message: 'User account and all associated data deleted',
+            itemsDeleted: itemsResult.deletedCount,
+            outfitsDeleted: outfitsResult.deletedCount,
+            listsDeleted: listsResult.deletedCount,
+            userDeleted: userResult.deletedCount
+        });
+
+    } catch (err) {
+        console.error('Account deletion failed:', err);
+        return res.status(500).json({ error: 'Failed to delete account' });
+    }
+});
+
 
 
 

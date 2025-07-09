@@ -18,6 +18,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
 import { useLocalSearchParams } from 'expo-router';
 import { useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { COLORS, SPACING, FONT_SIZES } from '../../constants/themes';
 
@@ -26,7 +27,7 @@ export default function AddItem() {
     const [name, setName] = useState('');
 
     const { name: paramName, category: paramCategory, imageUrl: paramImageUrl, id } = useLocalSearchParams();
-
+    const [userId, setId] = useState('');
     useEffect(() => {
         if (paramName || paramCategory || paramImageUrl) {
             setName(paramName || '');
@@ -63,18 +64,16 @@ export default function AddItem() {
 
             formData.append('name', name);
             formData.append('category', category);
-
+            formData.append('userId', userId);
+            console.log("Uploading for ", userId);
             const url = id
-                ? `http://10.0.0.104:3000/items/${id}`
+                ? `http://10.0.0.104:3000/items/${id}?userId=${userId}`
                 : `http://10.0.0.104:3000/items/upload`;
 
             const method = id ? 'PUT' : 'POST';
 
             const response = await fetch(url, {
                 method,
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                },
                 body: formData,
             });
 
@@ -145,38 +144,54 @@ export default function AddItem() {
 
     const router = useRouter();
 
-    const API_URL = 'http://10.0.0.104:3000/items';
+    const API_URL = 'http://10.0.0.104:3000';
+
+    const fetchItems = (url) => {
+        fetch(url)
+            .then(res => res.json())
+            .then(data => {
+                console.log("From [AddItem]:", data);
+                if (!Array.isArray(data)) throw new Error("Data is not an array");
+
+                const categorySet = new Set();
+                data.forEach(outfit => {
+                    if (outfit.category) {
+                        categorySet.add(outfit.category.toLowerCase());
+                    }
+                });
+
+                // Map to desired format: label (Capitalized), value (lowercase)
+                const dynamicCategories = Array.from(categorySet).map(cat => ({
+                    label: cat.charAt(0).toUpperCase() + cat.slice(1),
+                    value: cat,
+                }));
+                setCategories(dynamicCategories);
+            })
+            .catch(err => {
+                console.error("From [AddItem]:", 'Failed to fetch items:', err);
+                setLoading(false);
+            });
+    };
+
+    const getUserInfo = async () => {
+        try {
+            const userStr = await AsyncStorage.getItem('user');
+            if (userStr) {
+                const user = JSON.parse(userStr);
+                console.log("From [AddItem]:", "Logged in id: ", user.userId);
+                setId(user.userId);
+                const ITEMS_API_URL = `${API_URL}/items/?userId=${user.userId}`;
+                console.log("From [AddItem], url search: ", ITEMS_API_URL);
+                await fetchItems(ITEMS_API_URL);
+            }
+        } catch (e) {
+            console.error("From [HomeScreen]:", 'Error reading user:', e);
+        }
+    };
 
     useFocusEffect(
         useCallback(() => {
-            // setLoading(true);
-
-            fetch(API_URL)
-                .then(res => res.json())
-                .then(data => {
-                    // console.log('Fetched from backend:', data);
-                    // setResults(data);
-                    // setLoading(false);
-
-                    // Create dynamic categories based on fetched items where each item has a category
-                    const categorySet = new Set();
-                    data.forEach(outfit => {
-                        if (outfit.category) {
-                            categorySet.add(outfit.category.toLowerCase());
-                        }
-                    });
-
-                    // Map to desired format: label (Capitalized), value (lowercase)
-                    const dynamicCategories = Array.from(categorySet).map(cat => ({
-                        label: cat.charAt(0).toUpperCase() + cat.slice(1),
-                        value: cat,
-                    }));
-                    setCategories(dynamicCategories);
-                })
-                .catch(err => {
-                    console.error('Failed to fetch items:', err);
-                    // setLoading(false);
-                });
+            getUserInfo(); // now getUserInfo will handle fetching items
         }, [])
     );
 
