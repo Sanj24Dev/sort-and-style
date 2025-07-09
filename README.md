@@ -24,8 +24,8 @@
 - Create and save packing lists using existing closet items.
 - Useful for travel or event preparation.
 
-### Moodboards
-- Build digital moodboards with:
+### Wishlists
+- Build a wishlist and digital moodboards with:
   - Your saved outfits
   - External image or inspiration links
 - Visual planning for seasons, events, or fashion goals.
@@ -66,9 +66,13 @@ Basic API structure (secured with authentication):
 * PUT /packing-lists – Update a packing list
 * DELETE /packing-lists – Delete a packing list
 * POST /moodboards – Save visual boards with outfit IDs and URLs
+* POST /register - Add a new user
+* POST /login - Login a user
+* DELETE /user - Dele the user and their data
 
 ## 🎥 Demo
-A full video walkthrough will be added soon to showcase the app’s capabilities.
+Check out the [demo video](./demo.mp4) to view the features of the **Sort & Style** app.
+
 
 ## 🤝 Contributing
 Feel free to fork the repo and submit a pull request. For major changes, open an issue first to discuss the feature or fix.
